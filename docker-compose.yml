@@ -1,0 +1,14 @@
+services:
+  jarvis-board:
+    build: .
+    ports:
+      - "3333:80"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DB_PATH=/app/data/jarvis.db
+      # Generate tokens: ./generate-tokens.sh
+      - API_TOKENS=${API_TOKENS:-}
+      - BASIC_AUTH_USER=${BASIC_AUTH_USER:-ash}
+      - BASIC_AUTH_PASS=${BASIC_AUTH_PASS:-changeme}
+    restart: unless-stopped
