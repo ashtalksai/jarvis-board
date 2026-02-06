@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Board from '@/components/Board';
 import AddTaskForm from '@/components/AddTaskForm';
 import TaskModal from '@/components/TaskModal';
+import Link from 'next/link';
 
 export type Task = {
   id: number;
@@ -15,6 +16,9 @@ export type Task = {
   source: string;
   created_at: string;
   updated_at: string;
+  due_date?: string;
+  estimated_hours?: number;
+  actual_hours?: number;
 };
 
 const CATEGORIES = ['All', 'Learnings', 'Polymarket', 'Side Projects', 'Stravix', 'Coding', 'Workflow'];
@@ -83,6 +87,24 @@ export default function Home() {
           </div>
 
           <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+            {/* View Navigation */}
+            <div className="flex gap-2">
+              <Link
+                href="/"
+                className="px-3 py-1.5 rounded-md text-sm font-medium"
+                style={{ background: 'var(--accent)', color: '#fff' }}
+              >
+                Board
+              </Link>
+              <Link
+                href="/calendar"
+                className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+                style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+              >
+                Calendar
+              </Link>
+            </div>
+
             {/* Search */}
             <input
               type="text"

@@ -1,0 +1,40 @@
+{
+  "tasks": [
+    {
+      "title": "Review PR for feature-activity-feed",
+      "description": "Review and test the activity feed implementation",
+      "category": "Coding",
+      "priority": "High",
+      "status": "todo",
+      "due_date": "2025-02-08",
+      "estimated_hours": 2
+    },
+    {
+      "title": "Polymarket market analysis",
+      "description": "Analyze current market trends and opportunities",
+      "category": "Polymarket",
+      "priority": "Medium",
+      "status": "doing",
+      "due_date": "2025-02-09",
+      "estimated_hours": 3
+    },
+    {
+      "title": "Update documentation",
+      "description": "Update project documentation with calendar feature",
+      "category": "Coding",
+      "priority": "Low",
+      "status": "todo",
+      "due_date": "2025-02-10",
+      "estimated_hours": 1
+    },
+    {
+      "title": "Weekly planning meeting",
+      "description": "Plan tasks for next week",
+      "category": "Workflow",
+      "priority": "Medium",
+      "status": "todo",
+      "due_date": "2025-02-11",
+      "estimated_hours": 1
+    }
+  ]
+}
