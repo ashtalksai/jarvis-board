@@ -4,17 +4,37 @@ import { useState, useEffect } from 'react';
 import { Task } from '@/lib/db';
 
 type ViewMode = 'week' | 'month';
+type CalendarLayer = 'tasks' | 'cron' | 'both';
+
+interface CronJob {
+  id: string;
+  name: string;
+  schedule: string;
+  enabled: boolean;
+  lastRun?: string;
+  nextRun?: string;
+}
 
 export default function CalendarView() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [cronJobs, setCronJobs] = useState<CronJob[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [calendarLayer, setCalendarLayer] = useState<CalendarLayer>('both');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [cronError, setCronError] = useState<string | null>(null);
+  
+  // Filter states
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedPriority, setSelectedPriority] = useState<string>('all');
 
   useEffect(() => {
     loadTasks();
-  }, [currentDate, viewMode]);
+    if (calendarLayer === 'cron' || calendarLayer === 'both') {
+      loadCronJobs();
+    }
+  }, [currentDate, viewMode, calendarLayer]);
 
   const loadTasks = async () => {
     setIsLoading(true);
@@ -29,6 +49,24 @@ export default function CalendarView() {
       console.error('Failed to load calendar tasks:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadCronJobs = async () => {
+    try {
+      const response = await fetch('/api/cron');
+      const data = await response.json();
+      if (data.success) {
+        setCronJobs(data.data);
+        setCronError(null);
+      } else {
+        setCronError(data.error);
+        setCronJobs([]);
+      }
+    } catch (error) {
+      console.error('Failed to load cron jobs:', error);
+      setCronError('Failed to fetch cron jobs');
+      setCronJobs([]);
     }
   };
 
@@ -96,8 +134,32 @@ export default function CalendarView() {
 
   const getTasksForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
-    return tasks.filter(task => task.due_date?.startsWith(dateStr));
+    return tasks.filter(task => {
+      if (!task.due_date?.startsWith(dateStr)) return false;
+      
+      // Apply category filter
+      if (selectedCategory !== 'all' && task.category !== selectedCategory) {
+        return false;
+      }
+      
+      // Apply priority filter
+      if (selectedPriority !== 'all' && task.priority !== selectedPriority) {
+        return false;
+      }
+      
+      return true;
+    });
   };
+
+  const getCronJobsForDate = (date: Date) => {
+    // Simple heuristic: show all enabled cron jobs on every day
+    // In a real implementation, you'd parse cron schedules to determine actual run dates
+    return cronJobs.filter(job => job.enabled);
+  };
+
+  // Get unique categories and priorities from tasks for filter dropdowns
+  const categories = ['all', ...Array.from(new Set(tasks.map(t => t.category).filter(Boolean)))];
+  const priorities = ['all', 'Urgent', 'High', 'Medium', 'Low'];
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -180,6 +242,90 @@ export default function CalendarView() {
         </div>
       </div>
 
+      {/* Filter Controls */}
+      <div className="mb-4 flex flex-wrap items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        {/* Layer Toggle */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Show:</label>
+          <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600">
+            <button
+              onClick={() => setCalendarLayer('tasks')}
+              className={`px-3 py-1 text-xs font-medium rounded-l-lg transition-colors ${
+                calendarLayer === 'tasks'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              Tasks
+            </button>
+            <button
+              onClick={() => setCalendarLayer('cron')}
+              className={`px-3 py-1 text-xs font-medium border-x border-gray-300 dark:border-gray-600 transition-colors ${
+                calendarLayer === 'cron'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              Cron
+            </button>
+            <button
+              onClick={() => setCalendarLayer('both')}
+              className={`px-3 py-1 text-xs font-medium rounded-r-lg transition-colors ${
+                calendarLayer === 'both'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              Both
+            </button>
+          </div>
+        </div>
+
+        {/* Category Filter */}
+        {(calendarLayer === 'tasks' || calendarLayer === 'both') && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Category:</label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {categories.map(cat => (
+                <option key={cat} value={cat}>
+                  {cat === 'all' ? 'All Categories' : cat}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Priority Filter */}
+        {(calendarLayer === 'tasks' || calendarLayer === 'both') && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Priority:</label>
+            <select
+              value={selectedPriority}
+              onChange={(e) => setSelectedPriority(e.target.value)}
+              className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {priorities.map(pri => (
+                <option key={pri} value={pri}>
+                  {pri === 'all' ? 'All Priorities' : pri}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Cron Error Display */}
+        {cronError && calendarLayer !== 'tasks' && (
+          <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+            <span>⚠️</span>
+            <span>{cronError}</span>
+          </div>
+        )}
+      </div>
+
       {/* Date Range Display */}
       <div className="mb-4 text-center">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
@@ -199,7 +345,10 @@ export default function CalendarView() {
         <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
           {weekDays.map((date, index) => {
             const dayTasks = getTasksForDate(date);
+            const dayCronJobs = getCronJobsForDate(date);
             const today = isToday(date);
+            const showTasks = calendarLayer === 'tasks' || calendarLayer === 'both';
+            const showCron = calendarLayer === 'cron' || calendarLayer === 'both';
             
             return (
               <div
@@ -220,7 +369,8 @@ export default function CalendarView() {
                 </div>
                 
                 <div className="space-y-1">
-                  {dayTasks.map(task => (
+                  {/* Tasks */}
+                  {showTasks && dayTasks.map(task => (
                     <button
                       key={task.id}
                       onClick={() => setSelectedTask(task)}
@@ -234,9 +384,38 @@ export default function CalendarView() {
                       )}
                     </button>
                   ))}
-                  {dayTasks.length === 0 && (
+                  
+                  {/* Cron Jobs */}
+                  {showCron && dayCronJobs.map(cron => (
+                    <div
+                      key={cron.id}
+                      className="w-full text-left p-2 rounded text-xs bg-purple-500 dark:bg-purple-600 text-white border border-purple-600 dark:border-purple-700"
+                      title={`Schedule: ${cron.schedule}`}
+                    >
+                      <div className="font-medium truncate flex items-center gap-1">
+                        <span>⚙️</span>
+                        <span>{cron.name}</span>
+                      </div>
+                      <div className="text-xs opacity-90 mt-1 font-mono">
+                        {cron.schedule}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Empty State */}
+                  {showTasks && !showCron && dayTasks.length === 0 && (
                     <div className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
                       No tasks
+                    </div>
+                  )}
+                  {!showTasks && showCron && dayCronJobs.length === 0 && (
+                    <div className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
+                      No cron jobs
+                    </div>
+                  )}
+                  {showTasks && showCron && dayTasks.length === 0 && dayCronJobs.length === 0 && (
+                    <div className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
+                      No items
                     </div>
                   )}
                 </div>
