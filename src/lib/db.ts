@@ -46,6 +46,41 @@ function getDb(): Database.Database {
       CREATE INDEX IF NOT EXISTS idx_activities_entity ON activities(entity_type, entity_id);
     `);
 
+    // Create FTS5 virtual table for full-text search
+    db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
+        title,
+        description,
+        category,
+        content='tasks',
+        content_rowid='id'
+      )
+    `);
+
+    // Triggers to keep FTS index in sync
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS tasks_ai AFTER INSERT ON tasks BEGIN
+        INSERT INTO tasks_fts(rowid, title, description, category)
+        VALUES (new.id, new.title, new.description, new.category);
+      END
+    `);
+
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS tasks_ad AFTER DELETE ON tasks BEGIN
+        INSERT INTO tasks_fts(tasks_fts, rowid, title, description, category)
+        VALUES('delete', old.id, old.title, old.description, old.category);
+      END
+    `);
+
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS tasks_au AFTER UPDATE ON tasks BEGIN
+        INSERT INTO tasks_fts(tasks_fts, rowid, title, description, category)
+        VALUES('delete', old.id, old.title, old.description, old.category);
+        INSERT INTO tasks_fts(rowid, title, description, category)
+        VALUES (new.id, new.title, new.description, new.category);
+      END
+    `);
+
   }
   return db;
 }
@@ -134,6 +169,7 @@ export function deleteTask(id: number): boolean {
   return result.changes > 0;
 }
 
+<<<<<<< HEAD
 export function getTasksByDateRange(startDate: string, endDate: string): Task[] {
   const db = getDb();
   return db.prepare(`
@@ -263,4 +299,27 @@ export function getActivityStats(): {
     by_entity_type: Object.fromEntries(byEntityType.map(row => [row.entity_type, row.count])),
     recent_24h: recent24h.count,
   };
+}
+
+// ============================================================
+// SEARCH
+// ============================================================
+
+export type SearchResult = Task & {
+  rank: number;
+};
+
+export function searchTasks(query: string, limit: number = 10): SearchResult[] {
+  const db = getDb();
+  // Use FTS5 for full-text search with ranking
+  const results = db.prepare(`
+    SELECT tasks.*, tasks_fts.rank
+    FROM tasks_fts
+    JOIN tasks ON tasks.id = tasks_fts.rowid
+    WHERE tasks_fts MATCH ?
+    ORDER BY rank
+    LIMIT ?
+  `).all(query, limit) as SearchResult[];
+  
+  return results;
 }
