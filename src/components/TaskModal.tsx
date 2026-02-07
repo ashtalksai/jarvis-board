@@ -24,6 +24,9 @@ export default function TaskModal({ task, onClose, onUpdate, onDelete }: Props) 
     priority: task.priority,
     status: task.status,
     source: task.source,
+    due_date: task.due_date || '',
+    estimated_hours: task.estimated_hours || '',
+    actual_hours: task.actual_hours || '',
   });
 
   const handleSave = () => {
@@ -115,6 +118,52 @@ export default function TaskModal({ task, onClose, onUpdate, onDelete }: Props) 
               className="text-xs inline-flex items-center gap-1 hover:underline" style={{ color: 'var(--accent)' }}>
               🔗 {task.source.length > 50 ? task.source.slice(0, 50) + '...' : task.source}
             </a>
+          ) : null}
+
+          {/* Calendar Fields */}
+          {editing ? (
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Due Date</label>
+                <input
+                  type="date"
+                  value={form.due_date}
+                  onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+                  className="w-full px-2 py-1.5 rounded-md text-sm border outline-none"
+                  style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Est. Hours</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={form.estimated_hours}
+                  onChange={(e) => setForm({ ...form, estimated_hours: e.target.value })}
+                  placeholder="0"
+                  className="w-full px-2 py-1.5 rounded-md text-sm border outline-none"
+                  style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Actual Hours</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={form.actual_hours}
+                  onChange={(e) => setForm({ ...form, actual_hours: e.target.value })}
+                  placeholder="0"
+                  className="w-full px-2 py-1.5 rounded-md text-sm border outline-none"
+                  style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                />
+              </div>
+            </div>
+          ) : (task.due_date || task.estimated_hours || task.actual_hours) ? (
+            <div className="flex gap-2 flex-wrap text-xs" style={{ color: 'var(--text-muted)' }}>
+              {task.due_date && <span>📅 Due: {new Date(task.due_date).toLocaleDateString()}</span>}
+              {task.estimated_hours && <span>⏱️ Est: {task.estimated_hours}h</span>}
+              {task.actual_hours && <span>✓ Actual: {task.actual_hours}h</span>}
+            </div>
           ) : null}
 
           {/* Description */}
