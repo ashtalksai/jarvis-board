@@ -25,6 +25,41 @@ function getDb(): Database.Database {
       )
     `);
 
+    // Create FTS5 virtual table for full-text search
+    db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
+        title,
+        description,
+        category,
+        content='tasks',
+        content_rowid='id'
+      )
+    `);
+
+    // Triggers to keep FTS index in sync
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS tasks_ai AFTER INSERT ON tasks BEGIN
+        INSERT INTO tasks_fts(rowid, title, description, category)
+        VALUES (new.id, new.title, new.description, new.category);
+      END
+    `);
+
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS tasks_ad AFTER DELETE ON tasks BEGIN
+        INSERT INTO tasks_fts(tasks_fts, rowid, title, description, category)
+        VALUES('delete', old.id, old.title, old.description, old.category);
+      END
+    `);
+
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS tasks_au AFTER UPDATE ON tasks BEGIN
+        INSERT INTO tasks_fts(tasks_fts, rowid, title, description, category)
+        VALUES('delete', old.id, old.title, old.description, old.category);
+        INSERT INTO tasks_fts(rowid, title, description, category)
+        VALUES (new.id, new.title, new.description, new.category);
+      END
+    `);
+
   }
   return db;
 }
@@ -104,4 +139,23 @@ export function deleteTask(id: number): boolean {
   const db = getDb();
   const result = db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+export type SearchResult = Task & {
+  rank: number;
+};
+
+export function searchTasks(query: string, limit: number = 10): SearchResult[] {
+  const db = getDb();
+  // Use FTS5 for full-text search with ranking
+  const results = db.prepare(`
+    SELECT tasks.*, tasks_fts.rank
+    FROM tasks_fts
+    JOIN tasks ON tasks.id = tasks_fts.rowid
+    WHERE tasks_fts MATCH ?
+    ORDER BY rank
+    LIMIT ?
+  `).all(query, limit) as SearchResult[];
+  
+  return results;
 }
