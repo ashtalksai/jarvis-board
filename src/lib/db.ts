@@ -169,7 +169,6 @@ export function deleteTask(id: number): boolean {
   return result.changes > 0;
 }
 
-<<<<<<< HEAD
 export function getTasksByDateRange(startDate: string, endDate: string): Task[] {
   const db = getDb();
   return db.prepare(`
