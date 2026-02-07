@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllTasks, createTask } from '@/lib/db';
+import { getAllTasks, createTask, createActivity } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -19,5 +19,19 @@ export async function POST(request: NextRequest) {
   }
 
   const task = createTask(body);
+  
+  // Log activity
+  createActivity({
+    action: 'task.create',
+    entity_type: 'task',
+    entity_id: String(task.id),
+    details: {
+      title: task.title,
+      category: task.category,
+      priority: task.priority,
+      status: task.status,
+    },
+  });
+  
   return NextResponse.json(task, { status: 201 });
 }

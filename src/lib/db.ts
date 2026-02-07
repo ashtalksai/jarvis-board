@@ -25,6 +25,27 @@ function getDb(): Database.Database {
       )
     `);
 
+    // Activities table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS activities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action TEXT NOT NULL,
+        entity_type TEXT,
+        entity_id TEXT,
+        details TEXT,
+        session_id TEXT,
+        tokens_used INTEGER,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    // Create indices if they don't exist
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_activities_action ON activities(action);
+      CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at);
+      CREATE INDEX IF NOT EXISTS idx_activities_entity ON activities(entity_type, entity_id);
+    `);
+
   }
   return db;
 }
@@ -104,4 +125,123 @@ export function deleteTask(id: number): boolean {
   const db = getDb();
   const result = db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+// ============================================================
+// ACTIVITIES
+// ============================================================
+
+export type Activity = {
+  id: number;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  details: string | null;
+  session_id: string | null;
+  tokens_used: number | null;
+  created_at: string;
+};
+
+export type ActivityInput = {
+  action: string;
+  entity_type?: string;
+  entity_id?: string;
+  details?: Record<string, any>;
+  session_id?: string;
+  tokens_used?: number;
+};
+
+export type ActivityFilters = {
+  action?: string;
+  entity_type?: string;
+  entity_id?: string;
+  start_date?: string;
+  end_date?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export function createActivity(data: ActivityInput): Activity {
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT INTO activities (action, entity_type, entity_id, details, session_id, tokens_used)
+    VALUES (@action, @entity_type, @entity_id, @details, @session_id, @tokens_used)
+  `);
+  
+  const result = stmt.run({
+    action: data.action,
+    entity_type: data.entity_type || null,
+    entity_id: data.entity_id || null,
+    details: data.details ? JSON.stringify(data.details) : null,
+    session_id: data.session_id || null,
+    tokens_used: data.tokens_used || null,
+  });
+  
+  return db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid) as Activity;
+}
+
+export function getActivities(filters: ActivityFilters = {}): Activity[] {
+  const db = getDb();
+  let query = 'SELECT * FROM activities WHERE 1=1';
+  const params: Record<string, any> = {};
+
+  if (filters.action) {
+    query += ' AND action = @action';
+    params.action = filters.action;
+  }
+  if (filters.entity_type) {
+    query += ' AND entity_type = @entity_type';
+    params.entity_type = filters.entity_type;
+  }
+  if (filters.entity_id) {
+    query += ' AND entity_id = @entity_id';
+    params.entity_id = filters.entity_id;
+  }
+  if (filters.start_date) {
+    query += ' AND created_at >= @start_date';
+    params.start_date = filters.start_date;
+  }
+  if (filters.end_date) {
+    query += ' AND created_at <= @end_date';
+    params.end_date = filters.end_date;
+  }
+
+  query += ' ORDER BY created_at DESC';
+
+  if (filters.limit) {
+    query += ' LIMIT @limit';
+    params.limit = filters.limit;
+  }
+  if (filters.offset) {
+    query += ' OFFSET @offset';
+    params.offset = filters.offset;
+  }
+
+  return db.prepare(query).all(params) as Activity[];
+}
+
+export function getActivityStats(): {
+  total_activities: number;
+  total_tokens: number;
+  by_action: Record<string, number>;
+  by_entity_type: Record<string, number>;
+  recent_24h: number;
+} {
+  const db = getDb();
+  
+  const total = db.prepare('SELECT COUNT(*) as count FROM activities').get() as { count: number };
+  const totalTokens = db.prepare('SELECT SUM(tokens_used) as sum FROM activities WHERE tokens_used IS NOT NULL').get() as { sum: number | null };
+  
+  const byAction = db.prepare('SELECT action, COUNT(*) as count FROM activities GROUP BY action').all() as Array<{ action: string; count: number }>;
+  const byEntityType = db.prepare('SELECT entity_type, COUNT(*) as count FROM activities WHERE entity_type IS NOT NULL GROUP BY entity_type').all() as Array<{ entity_type: string; count: number }>;
+  
+  const recent24h = db.prepare("SELECT COUNT(*) as count FROM activities WHERE created_at >= datetime('now', '-1 day')").get() as { count: number };
+  
+  return {
+    total_activities: total.count,
+    total_tokens: totalTokens.sum || 0,
+    by_action: Object.fromEntries(byAction.map(row => [row.action, row.count])),
+    by_entity_type: Object.fromEntries(byEntityType.map(row => [row.entity_type, row.count])),
+    recent_24h: recent24h.count,
+  };
 }

@@ -80,6 +80,13 @@ export default function Home() {
           <div className="flex items-center gap-3 shrink-0">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" style={{ background: 'var(--accent)' }}>J</div>
             <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Jarvis Board</h1>
+            <a 
+              href="/activities"
+              className="ml-2 px-2.5 py-1 rounded-md text-xs font-medium transition-colors hover:opacity-80"
+              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+            >
+              📊 Activity
+            </a>
           </div>
 
           <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
