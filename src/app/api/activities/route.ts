@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     filters.offset = parseInt(searchParams.get('offset')!, 10);
   }
 
-  const activities = getActivities(filters);
+  const activities = await getActivities(filters);
   return NextResponse.json(activities);
 }
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Action is required' }, { status: 400 });
     }
 
-    const activity = createActivity({
+    const activity = await createActivity({
       action: body.action,
       entity_type: body.entity_type,
       entity_id: body.entity_id,

@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const category = searchParams.get('category') || undefined;
   const search = searchParams.get('search') || undefined;
 
-  const tasks = getAllTasks(status, category, search);
+  const tasks = await getAllTasks(status, category, search);
   return NextResponse.json(tasks);
 }
 
@@ -18,10 +18,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Title is required' }, { status: 400 });
   }
 
-  const task = createTask(body);
+  const task = await createTask(body);
   
   // Log activity
-  createActivity({
+  await createActivity({
     action: 'task.create',
     entity_type: 'task',
     entity_id: String(task.id),

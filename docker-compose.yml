@@ -1,14 +1,29 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: jarvis
+      POSTGRES_DB: jarvis
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
   jarvis-board:
     build: .
     ports:
-      - "3333:80"
-    volumes:
-      - ./data:/app/data
+      - "3333:3000"
     environment:
-      - DB_PATH=/app/data/jarvis.db
+      - DATABASE_URL=postgresql://jarvis:jarvis@postgres:5432/jarvis
       # Generate tokens: ./generate-tokens.sh
       - API_TOKENS=${API_TOKENS:-}
       - BASIC_AUTH_USER=${BASIC_AUTH_USER:-ash}
       - BASIC_AUTH_PASS=${BASIC_AUTH_PASS:-changeme}
+    depends_on:
+      - postgres
     restart: unless-stopped
+
+volumes:
+  postgres_data:

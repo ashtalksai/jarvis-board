@@ -12,9 +12,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
   }
 
-  const previousTask = getTaskById(taskId);
+  const previousTask = await getTaskById(taskId);
   const body = await request.json();
-  const task = updateTask(taskId, body);
+  const task = await updateTask(taskId, body);
   
   if (!task) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
@@ -33,7 +33,7 @@ export async function PATCH(
     });
   }
 
-  createActivity({
+  await createActivity({
     action: body.status && previousTask?.status !== body.status ? 'task.status_change' : 'task.update',
     entity_type: 'task',
     entity_id: String(taskId),
@@ -57,8 +57,8 @@ export async function DELETE(
     return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
   }
 
-  const task = getTaskById(taskId);
-  const deleted = deleteTask(taskId);
+  const task = await getTaskById(taskId);
+  const deleted = await deleteTask(taskId);
   
   if (!deleted) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
@@ -66,7 +66,7 @@ export async function DELETE(
 
   // Log activity
   if (task) {
-    createActivity({
+    await createActivity({
       action: 'task.delete',
       entity_type: 'task',
       entity_id: String(taskId),

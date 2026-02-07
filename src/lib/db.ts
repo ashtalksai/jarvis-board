@@ -1,88 +1,96 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import { Pool, QueryResult } from 'pg';
 
-const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'jarvis.db');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://jarvis:jarvis@localhost:5432/jarvis',
+});
 
-let db: Database.Database;
+let initialized = false;
 
-function getDb(): Database.Database {
-  if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-    
-    db.exec(`
+async function initDb() {
+  if (initialized) return;
+
+  const client = await pool.connect();
+  try {
+    // Tasks table
+    await client.query(`
       CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
         description TEXT DEFAULT '',
         category TEXT DEFAULT 'Inbox',
         priority TEXT DEFAULT 'Medium',
         status TEXT DEFAULT 'todo',
         source TEXT DEFAULT '',
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        due_date TIMESTAMP,
+        estimated_hours NUMERIC,
+        actual_hours NUMERIC,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
 
     // Activities table
-    db.exec(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS activities (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         action TEXT NOT NULL,
         entity_type TEXT,
         entity_id TEXT,
         details TEXT,
         session_id TEXT,
         tokens_used INTEGER,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TIMESTAMP DEFAULT NOW()
       )
     `);
 
     // Create indices if they don't exist
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_activities_action ON activities(action);
-      CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at);
-      CREATE INDEX IF NOT EXISTS idx_activities_entity ON activities(entity_type, entity_id);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_activities_action ON activities(action)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_activities_entity ON activities(entity_type, entity_id)
     `);
 
-    // Create FTS5 virtual table for full-text search
-    db.exec(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
-        title,
-        description,
-        category,
-        content='tasks',
-        content_rowid='id'
-      )
+    // Add full-text search columns
+    await client.query(`
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS search_vector tsvector
     `);
-
-    // Triggers to keep FTS index in sync
-    db.exec(`
-      CREATE TRIGGER IF NOT EXISTS tasks_ai AFTER INSERT ON tasks BEGIN
-        INSERT INTO tasks_fts(rowid, title, description, category)
-        VALUES (new.id, new.title, new.description, new.category);
+    
+    // Create or replace trigger function for updating search vector
+    await client.query(`
+      CREATE OR REPLACE FUNCTION tasks_search_vector_update() RETURNS trigger AS $$
+      BEGIN
+        NEW.search_vector :=
+          setweight(to_tsvector('english', COALESCE(NEW.title, '')), 'A') ||
+          setweight(to_tsvector('english', COALESCE(NEW.description, '')), 'B') ||
+          setweight(to_tsvector('english', COALESCE(NEW.category, '')), 'C');
+        RETURN NEW;
       END
+      $$ LANGUAGE plpgsql
     `);
 
-    db.exec(`
-      CREATE TRIGGER IF NOT EXISTS tasks_ad AFTER DELETE ON tasks BEGIN
-        INSERT INTO tasks_fts(tasks_fts, rowid, title, description, category)
-        VALUES('delete', old.id, old.title, old.description, old.category);
-      END
+    // Create trigger if it doesn't exist
+    await client.query(`
+      DROP TRIGGER IF EXISTS tasks_search_vector_trigger ON tasks
+    `);
+    await client.query(`
+      CREATE TRIGGER tasks_search_vector_trigger
+      BEFORE INSERT OR UPDATE ON tasks
+      FOR EACH ROW EXECUTE FUNCTION tasks_search_vector_update()
     `);
 
-    db.exec(`
-      CREATE TRIGGER IF NOT EXISTS tasks_au AFTER UPDATE ON tasks BEGIN
-        INSERT INTO tasks_fts(tasks_fts, rowid, title, description, category)
-        VALUES('delete', old.id, old.title, old.description, old.category);
-        INSERT INTO tasks_fts(rowid, title, description, category)
-        VALUES (new.id, new.title, new.description, new.category);
-      END
+    // Create index on search vector
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_tasks_search ON tasks USING gin(search_vector)
     `);
 
+    initialized = true;
+  } finally {
+    client.release();
   }
-  return db;
 }
 
 export type Task = {
@@ -100,85 +108,122 @@ export type Task = {
   actual_hours?: number | null;
 };
 
-export function getAllTasks(status?: string, category?: string, search?: string): Task[] {
-  const db = getDb();
-  let query = 'SELECT * FROM tasks WHERE 1=1';
-  const params: Record<string, string> = {};
+export async function getAllTasks(status?: string, category?: string, search?: string): Promise<Task[]> {
+  await initDb();
+  
+  let query = 'SELECT id, title, description, category, priority, status, source, created_at, updated_at, due_date, estimated_hours, actual_hours FROM tasks WHERE 1=1';
+  const params: any[] = [];
+  let paramCount = 1;
 
   if (status) {
-    query += ' AND status = @status';
-    params.status = status;
+    query += ` AND status = $${paramCount++}`;
+    params.push(status);
   }
   if (category) {
-    query += ' AND category = @category';
-    params.category = category;
+    query += ` AND category = $${paramCount++}`;
+    params.push(category);
   }
   if (search) {
-    query += ' AND (title LIKE @search OR description LIKE @search)';
-    params.search = `%${search}%`;
+    query += ` AND (title ILIKE $${paramCount} OR description ILIKE $${paramCount})`;
+    params.push(`%${search}%`);
+    paramCount++;
   }
 
-  query += ' ORDER BY CASE priority WHEN \'Urgent\' THEN 0 WHEN \'High\' THEN 1 WHEN \'Medium\' THEN 2 WHEN \'Low\' THEN 3 END, updated_at DESC';
+  query += ` ORDER BY 
+    CASE priority 
+      WHEN 'Urgent' THEN 0 
+      WHEN 'High' THEN 1 
+      WHEN 'Medium' THEN 2 
+      WHEN 'Low' THEN 3 
+    END, 
+    updated_at DESC`;
 
-  return db.prepare(query).all(params) as Task[];
+  const result = await pool.query(query, params);
+  return result.rows;
 }
 
-export function getTaskById(id: number): Task | undefined {
-  const db = getDb();
-  return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Task | undefined;
+export async function getTaskById(id: number): Promise<Task | undefined> {
+  await initDb();
+  const result = await pool.query(
+    'SELECT id, title, description, category, priority, status, source, created_at, updated_at, due_date, estimated_hours, actual_hours FROM tasks WHERE id = $1',
+    [id]
+  );
+  return result.rows[0];
 }
 
-export function createTask(data: Partial<Task>): Task {
-  const db = getDb();
-  const stmt = db.prepare(`
-    INSERT INTO tasks (title, description, category, priority, status, source, due_date, estimated_hours, actual_hours)
-    VALUES (@title, @description, @category, @priority, @status, @source, @due_date, @estimated_hours, @actual_hours)
-  `);
-  const result = stmt.run({
-    title: data.title || 'Untitled',
-    description: data.description || '',
-    category: data.category || 'Inbox',
-    priority: data.priority || 'Medium',
-    status: data.status || 'todo',
-    source: data.source || '',
-    due_date: data.due_date || null,
-    estimated_hours: data.estimated_hours || null,
-    actual_hours: data.actual_hours || null,
-  });
-  return getTaskById(result.lastInsertRowid as number)!;
+export async function createTask(data: Partial<Task>): Promise<Task> {
+  await initDb();
+  const result = await pool.query(
+    `INSERT INTO tasks (title, description, category, priority, status, source, due_date, estimated_hours, actual_hours)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id, title, description, category, priority, status, source, created_at, updated_at, due_date, estimated_hours, actual_hours`,
+    [
+      data.title || 'Untitled',
+      data.description || '',
+      data.category || 'Inbox',
+      data.priority || 'Medium',
+      data.status || 'todo',
+      data.source || '',
+      data.due_date || null,
+      data.estimated_hours || null,
+      data.actual_hours || null,
+    ]
+  );
+  return result.rows[0];
 }
 
-export function updateTask(id: number, data: Partial<Task>): Task | undefined {
-  const db = getDb();
-  const existing = getTaskById(id);
+export async function updateTask(id: number, data: Partial<Task>): Promise<Task | undefined> {
+  await initDb();
+  const existing = await getTaskById(id);
   if (!existing) return undefined;
 
-  const updated = { ...existing, ...data, updated_at: new Date().toISOString().replace('T', ' ').split('.')[0] };
-  db.prepare(`
-    UPDATE tasks SET title=@title, description=@description, category=@category,
-    priority=@priority, status=@status, source=@source, updated_at=@updated_at,
-    due_date=@due_date, estimated_hours=@estimated_hours, actual_hours=@actual_hours
-    WHERE id=@id
-  `).run(updated);
-  return getTaskById(id);
+  const updated = { ...existing, ...data };
+  const result = await pool.query(
+    `UPDATE tasks 
+     SET title=$1, description=$2, category=$3, priority=$4, status=$5, 
+         source=$6, due_date=$7, estimated_hours=$8, actual_hours=$9, updated_at=NOW()
+     WHERE id=$10
+     RETURNING id, title, description, category, priority, status, source, created_at, updated_at, due_date, estimated_hours, actual_hours`,
+    [
+      updated.title,
+      updated.description,
+      updated.category,
+      updated.priority,
+      updated.status,
+      updated.source,
+      updated.due_date || null,
+      updated.estimated_hours || null,
+      updated.actual_hours || null,
+      id,
+    ]
+  );
+  return result.rows[0];
 }
 
-export function deleteTask(id: number): boolean {
-  const db = getDb();
-  const result = db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
-  return result.changes > 0;
+export async function deleteTask(id: number): Promise<boolean> {
+  await initDb();
+  const result = await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
+  return (result.rowCount || 0) > 0;
 }
 
-export function getTasksByDateRange(startDate: string, endDate: string): Task[] {
-  const db = getDb();
-  return db.prepare(`
-    SELECT * FROM tasks 
-    WHERE due_date IS NOT NULL 
-    AND due_date >= @startDate 
-    AND due_date <= @endDate
-    ORDER BY due_date ASC, 
-    CASE priority WHEN 'Urgent' THEN 0 WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 END
-  `).all({ startDate, endDate }) as Task[];
+export async function getTasksByDateRange(startDate: string, endDate: string): Promise<Task[]> {
+  await initDb();
+  const result = await pool.query(
+    `SELECT id, title, description, category, priority, status, source, created_at, updated_at, due_date, estimated_hours, actual_hours
+     FROM tasks 
+     WHERE due_date IS NOT NULL 
+       AND due_date >= $1 
+       AND due_date <= $2
+     ORDER BY due_date ASC, 
+       CASE priority 
+         WHEN 'Urgent' THEN 0 
+         WHEN 'High' THEN 1 
+         WHEN 'Medium' THEN 2 
+         WHEN 'Low' THEN 3 
+       END`,
+    [startDate, endDate]
+  );
+  return result.rows;
 }
 
 // ============================================================
@@ -215,88 +260,96 @@ export type ActivityFilters = {
   offset?: number;
 };
 
-export function createActivity(data: ActivityInput): Activity {
-  const db = getDb();
-  const stmt = db.prepare(`
-    INSERT INTO activities (action, entity_type, entity_id, details, session_id, tokens_used)
-    VALUES (@action, @entity_type, @entity_id, @details, @session_id, @tokens_used)
-  `);
-  
-  const result = stmt.run({
-    action: data.action,
-    entity_type: data.entity_type || null,
-    entity_id: data.entity_id || null,
-    details: data.details ? JSON.stringify(data.details) : null,
-    session_id: data.session_id || null,
-    tokens_used: data.tokens_used || null,
-  });
-  
-  return db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid) as Activity;
+export async function createActivity(data: ActivityInput): Promise<Activity> {
+  await initDb();
+  const result = await pool.query(
+    `INSERT INTO activities (action, entity_type, entity_id, details, session_id, tokens_used)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, action, entity_type, entity_id, details, session_id, tokens_used, created_at`,
+    [
+      data.action,
+      data.entity_type || null,
+      data.entity_id || null,
+      data.details ? JSON.stringify(data.details) : null,
+      data.session_id || null,
+      data.tokens_used || null,
+    ]
+  );
+  return result.rows[0];
 }
 
-export function getActivities(filters: ActivityFilters = {}): Activity[] {
-  const db = getDb();
-  let query = 'SELECT * FROM activities WHERE 1=1';
-  const params: Record<string, any> = {};
+export async function getActivities(filters: ActivityFilters = {}): Promise<Activity[]> {
+  await initDb();
+  let query = 'SELECT id, action, entity_type, entity_id, details, session_id, tokens_used, created_at FROM activities WHERE 1=1';
+  const params: any[] = [];
+  let paramCount = 1;
 
   if (filters.action) {
-    query += ' AND action = @action';
-    params.action = filters.action;
+    query += ` AND action = $${paramCount++}`;
+    params.push(filters.action);
   }
   if (filters.entity_type) {
-    query += ' AND entity_type = @entity_type';
-    params.entity_type = filters.entity_type;
+    query += ` AND entity_type = $${paramCount++}`;
+    params.push(filters.entity_type);
   }
   if (filters.entity_id) {
-    query += ' AND entity_id = @entity_id';
-    params.entity_id = filters.entity_id;
+    query += ` AND entity_id = $${paramCount++}`;
+    params.push(filters.entity_id);
   }
   if (filters.start_date) {
-    query += ' AND created_at >= @start_date';
-    params.start_date = filters.start_date;
+    query += ` AND created_at >= $${paramCount++}`;
+    params.push(filters.start_date);
   }
   if (filters.end_date) {
-    query += ' AND created_at <= @end_date';
-    params.end_date = filters.end_date;
+    query += ` AND created_at <= $${paramCount++}`;
+    params.push(filters.end_date);
   }
 
   query += ' ORDER BY created_at DESC';
 
   if (filters.limit) {
-    query += ' LIMIT @limit';
-    params.limit = filters.limit;
+    query += ` LIMIT $${paramCount++}`;
+    params.push(filters.limit);
   }
   if (filters.offset) {
-    query += ' OFFSET @offset';
-    params.offset = filters.offset;
+    query += ` OFFSET $${paramCount++}`;
+    params.push(filters.offset);
   }
 
-  return db.prepare(query).all(params) as Activity[];
+  const result = await pool.query(query, params);
+  return result.rows;
 }
 
-export function getActivityStats(): {
+export async function getActivityStats(): Promise<{
   total_activities: number;
   total_tokens: number;
   by_action: Record<string, number>;
   by_entity_type: Record<string, number>;
   recent_24h: number;
-} {
-  const db = getDb();
+}> {
+  await initDb();
   
-  const total = db.prepare('SELECT COUNT(*) as count FROM activities').get() as { count: number };
-  const totalTokens = db.prepare('SELECT SUM(tokens_used) as sum FROM activities WHERE tokens_used IS NOT NULL').get() as { sum: number | null };
+  const totalResult = await pool.query('SELECT COUNT(*) as count FROM activities');
+  const total = parseInt(totalResult.rows[0].count);
   
-  const byAction = db.prepare('SELECT action, COUNT(*) as count FROM activities GROUP BY action').all() as Array<{ action: string; count: number }>;
-  const byEntityType = db.prepare('SELECT entity_type, COUNT(*) as count FROM activities WHERE entity_type IS NOT NULL GROUP BY entity_type').all() as Array<{ entity_type: string; count: number }>;
+  const tokensResult = await pool.query('SELECT SUM(tokens_used) as sum FROM activities WHERE tokens_used IS NOT NULL');
+  const totalTokens = parseInt(tokensResult.rows[0].sum || '0');
   
-  const recent24h = db.prepare("SELECT COUNT(*) as count FROM activities WHERE created_at >= datetime('now', '-1 day')").get() as { count: number };
+  const byActionResult = await pool.query('SELECT action, COUNT(*) as count FROM activities GROUP BY action');
+  const byAction = Object.fromEntries(byActionResult.rows.map(row => [row.action, parseInt(row.count)]));
+  
+  const byEntityResult = await pool.query('SELECT entity_type, COUNT(*) as count FROM activities WHERE entity_type IS NOT NULL GROUP BY entity_type');
+  const byEntityType = Object.fromEntries(byEntityResult.rows.map(row => [row.entity_type, parseInt(row.count)]));
+  
+  const recent24hResult = await pool.query("SELECT COUNT(*) as count FROM activities WHERE created_at >= NOW() - INTERVAL '1 day'");
+  const recent24h = parseInt(recent24hResult.rows[0].count);
   
   return {
-    total_activities: total.count,
-    total_tokens: totalTokens.sum || 0,
-    by_action: Object.fromEntries(byAction.map(row => [row.action, row.count])),
-    by_entity_type: Object.fromEntries(byEntityType.map(row => [row.entity_type, row.count])),
-    recent_24h: recent24h.count,
+    total_activities: total,
+    total_tokens: totalTokens,
+    by_action: byAction,
+    by_entity_type: byEntityType,
+    recent_24h: recent24h,
   };
 }
 
@@ -308,17 +361,20 @@ export type SearchResult = Task & {
   rank: number;
 };
 
-export function searchTasks(query: string, limit: number = 10): SearchResult[] {
-  const db = getDb();
-  // Use FTS5 for full-text search with ranking
-  const results = db.prepare(`
-    SELECT tasks.*, tasks_fts.rank
-    FROM tasks_fts
-    JOIN tasks ON tasks.id = tasks_fts.rowid
-    WHERE tasks_fts MATCH ?
-    ORDER BY rank
-    LIMIT ?
-  `).all(query, limit) as SearchResult[];
+export async function searchTasks(query: string, limit: number = 10): Promise<SearchResult[]> {
+  await initDb();
   
-  return results;
+  const result = await pool.query(
+    `SELECT 
+       id, title, description, category, priority, status, source, 
+       created_at, updated_at, due_date, estimated_hours, actual_hours,
+       ts_rank(search_vector, to_tsquery('english', $1)) as rank
+     FROM tasks
+     WHERE search_vector @@ to_tsquery('english', $1)
+     ORDER BY rank DESC
+     LIMIT $2`,
+    [query.split(' ').join(' & '), limit]
+  );
+  
+  return result.rows;
 }
