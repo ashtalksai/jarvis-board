@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3333",
     "build": "next build",
-    "start": "mkdir -p data && node .next/standalone/server.js",
+    "start": "mkdir -p data && next start -p 3000",
     "seed": "tsx src/lib/seed.ts"
   },
   "dependencies": {
