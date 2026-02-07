@@ -30,7 +30,11 @@ export default function TaskModal({ task, onClose, onUpdate, onDelete }: Props) 
   });
 
   const handleSave = () => {
-    onUpdate(task.id, form);
+    onUpdate(task.id, {
+      ...form,
+      estimated_hours: form.estimated_hours === '' ? undefined : Number(form.estimated_hours),
+      actual_hours: form.actual_hours === '' ? undefined : Number(form.actual_hours),
+    });
     setEditing(false);
   };
 
