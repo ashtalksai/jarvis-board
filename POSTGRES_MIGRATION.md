@@ -14,20 +14,9 @@ This migration replaces SQLite (better-sqlite3) with PostgreSQL for production-r
 
 ## Local Development
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: Local Postgres (Recommended)
 
-```bash
-# Start Postgres + App
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop
-docker-compose down
-```
-
-### Option 2: Local Postgres
+Best for development - simple and fast.
 
 1. Install Postgres:
 ```bash
@@ -55,12 +44,31 @@ export DATABASE_URL="postgresql://jarvis:jarvis@localhost:5432/jarvis"
 npm run dev
 ```
 
-## Deployment (Coolify)
+### Option 2: Docker Compose (Optional)
 
-1. Add environment variable in Coolify:
-   - `DATABASE_URL`: Connection string to your Postgres instance
+For testing production-like setup locally:
 
-2. Deploy the updated branch
+```bash
+# Start Postgres + App
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+```
+
+## Deployment
+
+See **[COOLIFY_DEPLOYMENT.md](./COOLIFY_DEPLOYMENT.md)** for complete Coolify setup guide.
+
+**Quick version:**
+1. Create Postgres database in Coolify
+2. Set DATABASE_URL environment variable
+3. Deploy with Node.js buildpack
+4. Build: `npm install && npm run build`
+5. Start: `npm start`
 
 ## Testing
 
