@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const tasks = getTasksByDateRange(start, end);
+    const tasks = await getTasksByDateRange(start, end);
     
     return NextResponse.json({
       success: true,

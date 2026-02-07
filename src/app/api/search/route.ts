@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const results = searchTasks(query, limit);
+    const results = await searchTasks(query, limit);
     return NextResponse.json({
       query,
       count: results.length,
