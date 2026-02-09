@@ -21,7 +21,7 @@ export default function Column({ id, title, icon, tasks, onTaskClick }: Props) {
   return (
     <div
       ref={setNodeRef}
-      className={`terminal-window flex flex-col min-h-[400px] ${isOver ? 'drag-over' : ''}`}
+      className={`terminal-window flex flex-col h-full min-h-0 ${isOver ? 'drag-over' : ''}`}
       style={{
         borderColor: isOver ? 'var(--primary)' : undefined,
         background: isOver ? 'var(--bg-hover)' : undefined,
@@ -45,7 +45,7 @@ export default function Column({ id, title, icon, tasks, onTaskClick }: Props) {
       </div>
       
       {/* Tasks container */}
-      <div className="flex-1 p-2 flex flex-col gap-2 overflow-y-auto">
+      <div className="flex-1 p-2 flex flex-col gap-2 overflow-y-auto min-h-0">
         {tasks.map((task) => (
           <TaskCard 
             key={task.id} 

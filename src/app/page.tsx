@@ -175,7 +175,7 @@ export default function Home() {
       </header>
 
       {/* Board */}
-      <main className="flex-1 p-4 sm:p-6 max-w-[1800px] mx-auto w-full overflow-auto">
+      <main className="flex-1 p-4 sm:p-6 max-w-[1800px] mx-auto w-full overflow-hidden">
         <Board
           tasks={tasks}
           onStatusChange={handleStatusChange}
