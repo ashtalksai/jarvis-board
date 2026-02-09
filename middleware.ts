@@ -19,13 +19,10 @@ export function middleware(request: NextRequest) {
   }
   
   // Check if auth is enabled
+  // Note: In production, always require auth even if env vars missing
   const authPass = process.env.AUTH_PASS;
   const apiTokens = process.env.API_TOKENS;
-  
-  if (!authPass && !apiTokens) {
-    // No auth configured - allow all
-    return NextResponse.next();
-  }
+  const isProduction = process.env.NODE_ENV === 'production';
   
   // Check API token for API routes
   if (pathname.startsWith('/api/')) {
