@@ -21,7 +21,7 @@ export default function Column({ id, title, icon, tasks, onTaskClick }: Props) {
   return (
     <div
       ref={setNodeRef}
-      className={`terminal-window flex flex-col h-full min-h-0 ${isOver ? 'drag-over' : ''}`}
+      className={`terminal-window flex flex-col h-full min-h-0 w-[85vw] sm:w-auto shrink-0 sm:shrink snap-center ${isOver ? 'drag-over' : ''}`}
       style={{
         borderColor: isOver ? 'var(--primary)' : undefined,
         background: isOver ? 'var(--bg-hover)' : undefined,

@@ -90,45 +90,43 @@ export default function Home() {
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--background)' }}>
       {/* Header */}
       <header 
-        className="shrink-0 z-40 border-b px-4 h-14 flex items-center"
+        className="shrink-0 z-40 border-b px-3 sm:px-4 h-12 sm:h-14 flex items-center"
         style={{ 
           borderColor: 'var(--border)',
           background: 'rgba(10, 10, 10, 0.95)',
         }}
       >
-        <div className="max-w-[1800px] mx-auto w-full flex items-center gap-4">
+        <div className="max-w-[1800px] mx-auto w-full flex items-center gap-2 sm:gap-4">
           {/* Logo & Title */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="logo">J</div>
-            <div>
-              <h1 
-                className="text-base font-semibold flex items-center gap-2" 
-                style={{ color: 'var(--text-primary)' }}
-              >
-                <span className="cmd-prefix">$</span>
-                <span>jarvis-board</span>
-                {unreadCount > 0 && (
-                  <span className="unread-badge">{unreadCount}</span>
-                )}
-              </h1>
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="logo text-sm sm:text-base">J</div>
+            <h1 
+              className="text-sm sm:text-base font-semibold hidden sm:flex items-center gap-2" 
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <span className="cmd-prefix">$</span>
+              <span>jarvis-board</span>
+              {unreadCount > 0 && (
+                <span className="unread-badge">{unreadCount}</span>
+              )}
+            </h1>
           </div>
 
           {/* View Navigation */}
-          <div className="flex gap-2 shrink-0">
-            <Link href="/" className="nav-link active">
+          <div className="flex gap-1 sm:gap-2 shrink-0">
+            <Link href="/" className="nav-link active text-xs sm:text-sm">
               Board
             </Link>
-            <Link href="/calendar" className="nav-link">
+            <Link href="/calendar" className="nav-link text-xs sm:text-sm">
               Calendar
             </Link>
-            <Link href="/activities" className="nav-link">
+            <Link href="/activities" className="nav-link text-xs sm:text-sm hidden sm:block">
               Activity
             </Link>
           </div>
 
-          {/* Search */}
-          <div className="relative w-48 shrink-0 hidden sm:block">
+          {/* Search - hidden on mobile */}
+          <div className="relative w-48 shrink-0 hidden lg:block">
             <input
               type="text"
               placeholder="search..."
@@ -148,8 +146,8 @@ export default function Home() {
             </kbd>
           </div>
 
-          {/* Category filter - horizontal scroll on overflow */}
-          <div className="flex-1 overflow-x-auto hide-scrollbar">
+          {/* Category filter - hidden on mobile */}
+          <div className="flex-1 overflow-x-auto hide-scrollbar hidden md:block">
             <div className="flex gap-1">
               {CATEGORIES.map((cat) => (
                 <button
@@ -164,18 +162,21 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Spacer on mobile */}
+          <div className="flex-1 md:hidden" />
+
           {/* Add button */}
           <button
             onClick={() => setShowAddForm(true)}
-            className="btn btn-primary shrink-0"
+            className="btn btn-primary shrink-0 text-xs sm:text-sm py-1.5 px-2 sm:px-3"
           >
-            <span className="cmd-prefix">+</span> add
+            <span className="cmd-prefix">+</span> <span className="hidden sm:inline">add</span>
           </button>
         </div>
       </header>
 
       {/* Board */}
-      <main className="flex-1 p-4 sm:p-6 max-w-[1800px] mx-auto w-full overflow-hidden">
+      <main className="flex-1 p-3 sm:p-6 max-w-[1800px] mx-auto w-full overflow-hidden">
         <Board
           tasks={tasks}
           onStatusChange={handleStatusChange}
