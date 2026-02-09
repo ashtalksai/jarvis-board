@@ -69,7 +69,7 @@ export default function Board({ tasks, onStatusChange, onTaskClick }: Props) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory sm:snap-none pb-4 sm:pb-0">
+      <div className="flex flex-row sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 h-full overflow-x-auto sm:overflow-x-visible snap-x snap-mandatory sm:snap-none pb-4 sm:pb-0 -mx-3 px-3 sm:mx-0 sm:px-0">
         {COLUMNS.map((col) => (
           <Column
             key={col.id}
