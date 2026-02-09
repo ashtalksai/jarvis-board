@@ -12,16 +12,21 @@ export type Task = {
   description: string;
   category: string;
   priority: string;
+  priority_level: number;
   status: string;
   source: string;
   created_at: string;
   updated_at: string;
   due_date?: string;
+  eta?: string;
   estimated_hours?: number;
   actual_hours?: number;
+  last_activity_at?: string;
+  tags?: string[];
+  has_unread?: boolean;
 };
 
-const CATEGORIES = ['All', 'Learnings', 'Polymarket', 'Side Projects', 'Stravix', 'Coding', 'Workflow'];
+const CATEGORIES = ['All', 'Inbox', 'Learnings', 'Polymarket', 'Side Projects', 'Stravix', 'Coding', 'Workflow'];
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -29,6 +34,7 @@ export default function Home() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [filterCategory, setFilterCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchTasks = useCallback(async () => {
     const params = new URLSearchParams();
@@ -37,6 +43,10 @@ export default function Home() {
     const res = await fetch(`/api/tasks?${params}`);
     const data = await res.json();
     setTasks(data);
+    
+    // Count unread
+    const unread = data.filter((t: Task) => t.has_unread).length;
+    setUnreadCount(unread);
   }, [filterCategory, searchQuery]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
@@ -77,38 +87,45 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
       {/* Header */}
-      <header className="border-b px-4 sm:px-6 py-4" style={{ borderColor: 'var(--border)' }}>
-        <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row sm:items-center gap-3">
+      <header 
+        className="sticky top-0 z-40 border-b px-4 py-3"
+        style={{ 
+          borderColor: 'var(--border)',
+          background: 'rgba(10, 10, 10, 0.8)',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        <div className="max-w-[1800px] mx-auto flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Logo & Title */}
           <div className="flex items-center gap-3 shrink-0">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" style={{ background: 'var(--accent)' }}>J</div>
-            <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Jarvis Board</h1>
-            <a 
-              href="/activities"
-              className="ml-2 px-2.5 py-1 rounded-md text-xs font-medium transition-colors hover:opacity-80"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-            >
-              📊 Activity
-            </a>
+            <div className="logo">J</div>
+            <div>
+              <h1 
+                className="text-base font-semibold flex items-center gap-2" 
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <span className="cmd-prefix">$</span>
+                <span>jarvis-board</span>
+                {unreadCount > 0 && (
+                  <span className="unread-badge">{unreadCount}</span>
+                )}
+              </h1>
+            </div>
           </div>
 
           <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
             {/* View Navigation */}
             <div className="flex gap-2">
-              <Link
-                href="/"
-                className="px-3 py-1.5 rounded-md text-sm font-medium"
-                style={{ background: 'var(--accent)', color: '#fff' }}
-              >
+              <Link href="/" className="nav-link active">
                 Board
               </Link>
-              <Link
-                href="/calendar"
-                className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
-                style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-              >
+              <Link href="/calendar" className="nav-link">
                 Calendar
+              </Link>
+              <Link href="/activities" className="nav-link">
+                Activity
               </Link>
             </div>
 
@@ -116,14 +133,19 @@ export default function Home() {
             <div className="relative sm:w-64">
               <input
                 type="text"
-                placeholder="Search tasks..."
+                placeholder="search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-3 py-1.5 pr-16 rounded-md text-sm border outline-none focus:ring-1"
-                style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent)' } as React.CSSProperties}
+                className="input pr-16"
               />
-              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-xs rounded border opacity-50"
-                style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
+              <kbd 
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] rounded border"
+                style={{ 
+                  background: 'var(--bg-tertiary)', 
+                  borderColor: 'var(--border)', 
+                  color: 'var(--text-muted)' 
+                }}
+              >
                 ⌘K
               </kbd>
             </div>
@@ -134,11 +156,8 @@ export default function Home() {
                 <button
                   key={cat}
                   onClick={() => setFilterCategory(cat)}
-                  className="px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
-                  style={{
-                    background: filterCategory === cat ? 'var(--accent)' : 'var(--bg-tertiary)',
-                    color: filterCategory === cat ? '#fff' : 'var(--text-secondary)',
-                  }}
+                  className={`nav-link ${filterCategory === cat ? 'active' : ''}`}
+                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                 >
                   {cat}
                 </button>
@@ -148,17 +167,16 @@ export default function Home() {
             {/* Add button */}
             <button
               onClick={() => setShowAddForm(true)}
-              className="px-3 py-1.5 rounded-md text-sm font-medium sm:ml-auto shrink-0"
-              style={{ background: 'var(--accent)', color: '#fff' }}
+              className="btn btn-primary sm:ml-auto shrink-0"
             >
-              + Add Task
+              <span className="cmd-prefix">+</span> add task
             </button>
           </div>
         </div>
       </header>
 
       {/* Board */}
-      <main className="p-4 sm:p-6 max-w-[1600px] mx-auto">
+      <main className="flex-1 p-4 sm:p-6 max-w-[1800px] mx-auto w-full overflow-x-auto">
         <Board
           tasks={tasks}
           onStatusChange={handleStatusChange}
@@ -173,6 +191,7 @@ export default function Home() {
           onClose={() => setSelectedTask(null)}
           onUpdate={handleTaskUpdate}
           onDelete={handleDelete}
+          onRefresh={fetchTasks}
         />
       )}
       {showAddForm && (

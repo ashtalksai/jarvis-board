@@ -5,36 +5,45 @@ import Link from 'next/link';
 
 export default function CalendarPage() {
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
       {/* Header */}
-      <header className="border-b px-4 sm:px-6 py-4" style={{ borderColor: 'var(--border)' }}>
+      <header 
+        className="sticky top-0 z-40 border-b px-4 py-3"
+        style={{ 
+          borderColor: 'var(--border)',
+          background: 'rgba(10, 10, 10, 0.8)',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
         <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Logo & Title */}
           <div className="flex items-center gap-3 shrink-0">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" style={{ background: 'var(--accent)' }}>J</div>
-            <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Jarvis Board</h1>
+            <div className="logo">J</div>
+            <h1 
+              className="text-base font-semibold flex items-center gap-2" 
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <span className="cmd-prefix">$</span>
+              <span>jarvis-board</span>
+            </h1>
           </div>
 
           <div className="flex-1 flex items-center gap-2 sm:ml-4">
-            <Link
-              href="/"
-              className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-            >
+            <Link href="/" className="nav-link">
               Board
             </Link>
-            <Link
-              href="/calendar"
-              className="px-3 py-1.5 rounded-md text-sm font-medium"
-              style={{ background: 'var(--accent)', color: '#fff' }}
-            >
+            <Link href="/calendar" className="nav-link active">
               Calendar
+            </Link>
+            <Link href="/activities" className="nav-link">
+              Activity
             </Link>
           </div>
         </div>
       </header>
 
       {/* Calendar */}
-      <main>
+      <main className="flex-1">
         <CalendarView />
       </main>
     </div>

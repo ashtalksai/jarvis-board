@@ -1,6 +1,6 @@
 'use client';
 
-import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragStartEvent, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { useState } from 'react';
 import Column from './Column';
 import TaskCard from './TaskCard';
@@ -13,11 +13,12 @@ type Props = {
 };
 
 const COLUMNS = [
-  { id: 'todo', title: 'To Do', emoji: '📋' },
-  { id: 'doing', title: 'Doing', emoji: '🔄' },
-  { id: 'review', title: 'Ready for Review', emoji: '👀' },
-  { id: 'on_hold', title: 'On Hold', emoji: '⏸️' },
-  { id: 'done', title: 'Done', emoji: '✅' },
+  { id: 'backlog', title: 'Backlog', icon: '📥' },
+  { id: 'doing', title: 'Doing', icon: '⚡' },
+  { id: 'review', title: 'Review', icon: '👀' },
+  { id: 'on_hold', title: 'On Hold', icon: '⏸' },
+  { id: 'done', title: 'Done', icon: '✓' },
+  { id: 'archived', title: 'Archived', icon: '📦' },
 ];
 
 export default function Board({ tasks, onStatusChange, onTaskClick }: Props) {
@@ -58,6 +59,9 @@ export default function Board({ tasks, onStatusChange, onTaskClick }: Props) {
     }
   };
 
+  // Filter out archived tasks from main view unless viewing archived column
+  const visibleTasks = tasks;
+
   return (
     <DndContext
       sensors={sensors}
@@ -65,14 +69,14 @@ export default function Board({ tasks, onStatusChange, onTaskClick }: Props) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {COLUMNS.map((col) => (
           <Column
             key={col.id}
             id={col.id}
             title={col.title}
-            emoji={col.emoji}
-            tasks={tasks.filter((t) => t.status === col.id)}
+            icon={col.icon}
+            tasks={visibleTasks.filter((t) => t.status === col.id)}
             onTaskClick={onTaskClick}
           />
         ))}

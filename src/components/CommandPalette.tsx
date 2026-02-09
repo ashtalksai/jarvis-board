@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 
 type SearchResult = {
   id: number;
@@ -9,6 +8,7 @@ type SearchResult = {
   description: string;
   category: string;
   priority: string;
+  priority_level: number;
   status: string;
   rank: number;
 };
@@ -19,7 +19,6 @@ export default function CommandPalette() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const router = useRouter();
 
   // Handle keyboard shortcut (Cmd+K / Ctrl+K)
   useEffect(() => {
@@ -77,106 +76,154 @@ export default function CommandPalette() {
   }, [results, selectedIndex]);
 
   const selectResult = (result: SearchResult) => {
-    // Navigate to task detail or open modal
-    router.push(`/?task=${result.id}`);
+    // Navigate to task detail
+    window.location.href = `/?task=${result.id}`;
     setIsOpen(false);
     setQuery('');
+  };
+
+  const getPriorityLabel = (level: number) => {
+    switch (level) {
+      case 4: return '🔥';
+      case 3: return '3';
+      case 2: return '2';
+      default: return '1';
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-start justify-center pt-20">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl mx-4">
+    <div 
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
+      style={{ background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}
+      onClick={() => setIsOpen(false)}
+    >
+      <div 
+        className="terminal-window w-full max-w-2xl mx-4 animate-fade-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="window-header">
+          <div className="window-dots">
+            <span className="window-dot red" />
+            <span className="window-dot yellow" />
+            <span className="window-dot green" />
+          </div>
+          <span className="window-title">
+            <span className="cmd-prefix">$</span> search
+          </span>
+          <span className="window-status">⌘K</span>
+        </div>
+
         {/* Search Input */}
-        <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+        <div className="p-4 border-b" style={{ borderColor: 'var(--border)' }}>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search tasks... (Type to search, ↑↓ to navigate, Enter to select, Esc to close)"
-            className="w-full px-4 py-2 text-lg bg-transparent border-none focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-500"
+            placeholder="Search tasks..."
+            className="input"
             autoFocus
           />
         </div>
 
         {/* Results */}
-        <div className="max-h-96 overflow-y-auto">
+        <div className="max-h-80 overflow-y-auto">
           {loading && (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-              Searching...
+            <div className="p-4 text-center" style={{ color: 'var(--text-muted)' }}>
+              <span className="cmd-prefix">$</span> searching...
             </div>
           )}
 
           {!loading && query && results.length === 0 && (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-              No results found for "{query}"
+            <div className="p-4 text-center" style={{ color: 'var(--text-muted)' }}>
+              No results for "{query}"
             </div>
           )}
 
           {!loading && !query && (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-              Type to search tasks by title, description, or category
+            <div className="p-4 text-center" style={{ color: 'var(--text-muted)' }}>
+              Type to search tasks
             </div>
           )}
 
           {!loading && results.length > 0 && (
-            <ul>
+            <div>
               {results.map((result, index) => (
-                <li
+                <button
                   key={result.id}
-                  className={`border-b border-gray-200 dark:border-gray-700 last:border-0 ${
-                    index === selectedIndex
-                      ? 'bg-blue-50 dark:bg-blue-900'
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
+                  onClick={() => selectResult(result)}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  className="w-full text-left p-3 border-b transition-colors"
+                  style={{
+                    borderColor: 'var(--border)',
+                    background: index === selectedIndex ? 'var(--bg-hover)' : 'transparent',
+                  }}
                 >
-                  <button
-                    onClick={() => selectResult(result)}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    className="w-full text-left p-4 focus:outline-none"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 dark:text-white truncate">
-                          {result.title}
-                        </h3>
-                        {result.description && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mt-1">
-                            {result.description}
-                          </p>
-                        )}
-                        <div className="flex gap-2 mt-2">
-                          <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                            {result.category}
-                          </span>
-                          <span className={`text-xs px-2 py-1 rounded ${
-                            result.priority === 'Urgent' ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' :
-                            result.priority === 'High' ? 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300' :
-                            result.priority === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300' :
-                            'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                          }`}>
-                            {result.priority}
-                          </span>
-                          <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                            {result.status}
-                          </span>
+                  <div className="flex items-start gap-3">
+                    {/* Priority badge */}
+                    <span className={`priority-badge priority-${result.priority_level || 2} shrink-0`}>
+                      {getPriorityLabel(result.priority_level || 2)}
+                    </span>
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div 
+                        className="font-medium text-sm truncate"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        {result.title}
+                      </div>
+                      {result.description && (
+                        <div 
+                          className="text-xs mt-1 line-clamp-1"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          {result.description}
                         </div>
+                      )}
+                      <div className="flex gap-2 mt-2">
+                        <span className={`status-badge status-${result.status}`}>
+                          {result.status.replace('_', ' ')}
+                        </span>
+                        <span 
+                          className="tag-pill"
+                          style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
+                        >
+                          {result.category}
+                        </span>
                       </div>
                     </div>
-                  </button>
-                </li>
+                  </div>
+                </button>
               ))}
-            </ul>
+            </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900 text-xs text-gray-500 dark:text-gray-400 flex justify-between rounded-b-lg">
-          <span>Press <kbd className="px-1 py-0.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">↑↓</kbd> to navigate</span>
-          <span>Press <kbd className="px-1 py-0.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">Enter</kbd> to select</span>
-          <span>Press <kbd className="px-1 py-0.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">Esc</kbd> to close</span>
+        <div 
+          className="p-3 flex justify-between text-xs"
+          style={{ 
+            borderTop: '1px solid var(--border)',
+            color: 'var(--text-muted)',
+            background: 'var(--bg-code)',
+          }}
+        >
+          <span>
+            <kbd className="px-1.5 py-0.5 rounded border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>↑↓</kbd>
+            {' '}navigate
+          </span>
+          <span>
+            <kbd className="px-1.5 py-0.5 rounded border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>↵</kbd>
+            {' '}select
+          </span>
+          <span>
+            <kbd className="px-1.5 py-0.5 rounded border" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>esc</kbd>
+            {' '}close
+          </span>
         </div>
       </div>
     </div>
