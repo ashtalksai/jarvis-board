@@ -102,6 +102,15 @@
   background: var(--border-hover);
 }
 
+/* Hide scrollbar but allow scroll */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   background: var(--background);
   background-image: 

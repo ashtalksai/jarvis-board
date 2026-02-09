@@ -87,17 +87,16 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--background)' }}>
       {/* Header */}
       <header 
-        className="sticky top-0 z-40 border-b px-4 py-3"
+        className="shrink-0 z-40 border-b px-4 h-14 flex items-center"
         style={{ 
           borderColor: 'var(--border)',
-          background: 'rgba(10, 10, 10, 0.8)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(10, 10, 10, 0.95)',
         }}
       >
-        <div className="max-w-[1800px] mx-auto flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="max-w-[1800px] mx-auto w-full flex items-center gap-4">
           {/* Logo & Title */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="logo">J</div>
@@ -115,68 +114,68 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-            {/* View Navigation */}
-            <div className="flex gap-2">
-              <Link href="/" className="nav-link active">
-                Board
-              </Link>
-              <Link href="/calendar" className="nav-link">
-                Calendar
-              </Link>
-              <Link href="/activities" className="nav-link">
-                Activity
-              </Link>
-            </div>
+          {/* View Navigation */}
+          <div className="flex gap-2 shrink-0">
+            <Link href="/" className="nav-link active">
+              Board
+            </Link>
+            <Link href="/calendar" className="nav-link">
+              Calendar
+            </Link>
+            <Link href="/activities" className="nav-link">
+              Activity
+            </Link>
+          </div>
 
-            {/* Search */}
-            <div className="relative sm:w-64">
-              <input
-                type="text"
-                placeholder="search tasks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="input pr-16"
-              />
-              <kbd 
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] rounded border"
-                style={{ 
-                  background: 'var(--bg-tertiary)', 
-                  borderColor: 'var(--border)', 
-                  color: 'var(--text-muted)' 
-                }}
-              >
-                ⌘K
-              </kbd>
-            </div>
+          {/* Search */}
+          <div className="relative w-48 shrink-0 hidden sm:block">
+            <input
+              type="text"
+              placeholder="search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input pr-10 py-1.5 text-sm"
+            />
+            <kbd 
+              className="absolute right-2 top-1/2 -translate-y-1/2 px-1 py-0.5 text-[9px] rounded border"
+              style={{ 
+                background: 'var(--bg-tertiary)', 
+                borderColor: 'var(--border)', 
+                color: 'var(--text-muted)' 
+              }}
+            >
+              ⌘K
+            </kbd>
+          </div>
 
-            {/* Category filter */}
-            <div className="flex gap-1 flex-wrap">
+          {/* Category filter - horizontal scroll on overflow */}
+          <div className="flex-1 overflow-x-auto hide-scrollbar">
+            <div className="flex gap-1">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilterCategory(cat)}
-                  className={`nav-link ${filterCategory === cat ? 'active' : ''}`}
+                  className={`nav-link shrink-0 ${filterCategory === cat ? 'active' : ''}`}
                   style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                 >
                   {cat}
                 </button>
               ))}
             </div>
-
-            {/* Add button */}
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="btn btn-primary sm:ml-auto shrink-0"
-            >
-              <span className="cmd-prefix">+</span> add task
-            </button>
           </div>
+
+          {/* Add button */}
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="btn btn-primary shrink-0"
+          >
+            <span className="cmd-prefix">+</span> add
+          </button>
         </div>
       </header>
 
       {/* Board */}
-      <main className="flex-1 p-4 sm:p-6 max-w-[1800px] mx-auto w-full overflow-x-auto">
+      <main className="flex-1 p-4 sm:p-6 max-w-[1800px] mx-auto w-full overflow-auto">
         <Board
           tasks={tasks}
           onStatusChange={handleStatusChange}

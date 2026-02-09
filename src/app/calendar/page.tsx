@@ -5,17 +5,16 @@ import Link from 'next/link';
 
 export default function CalendarPage() {
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--background)' }}>
       {/* Header */}
       <header 
-        className="sticky top-0 z-40 border-b px-4 py-3"
+        className="shrink-0 z-40 border-b px-4 h-14 flex items-center"
         style={{ 
           borderColor: 'var(--border)',
-          background: 'rgba(10, 10, 10, 0.8)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(10, 10, 10, 0.95)',
         }}
       >
-        <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="max-w-[1800px] mx-auto w-full flex items-center gap-4">
           {/* Logo & Title */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="logo">J</div>
@@ -28,7 +27,8 @@ export default function CalendarPage() {
             </h1>
           </div>
 
-          <div className="flex-1 flex items-center gap-2 sm:ml-4">
+          {/* View Navigation */}
+          <div className="flex gap-2 shrink-0">
             <Link href="/" className="nav-link">
               Board
             </Link>
@@ -43,7 +43,7 @@ export default function CalendarPage() {
       </header>
 
       {/* Calendar */}
-      <main className="flex-1">
+      <main className="flex-1 overflow-auto">
         <CalendarView />
       </main>
     </div>
