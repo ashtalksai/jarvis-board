@@ -137,6 +137,15 @@ Content-Type: application/json
 DELETE /api/tasks/:id
 ```
 
+### Calendar
+
+#### Get Tasks by Date Range
+```bash
+GET /api/tasks/calendar?start=2024-02-01&end=2024-02-28
+```
+
+Returns tasks with `due_date` in the specified range, sorted by date and priority.
+
 ### Activities
 
 #### List Activities
